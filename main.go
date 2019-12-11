@@ -97,11 +97,6 @@ func testTransfer(cfg *config.Config, account *goSdk.Account, token config.Token
 	if txNum > math.MaxUint32 {
 		txNum = math.MaxUint32
 	}
-	contractAddress, err := utils.AddressFromHexString(cfg.Contract)
-	if err != nil {
-		log.Errorf("parse contract addr failed, err: %s", err)
-		return
-	}
 	toAddr, err := utils.AddressFromBase58(cfg.To)
 	if err != nil {
 		log.Errorf("parse to addr failed, err: %s", err)
@@ -114,6 +109,11 @@ func testTransfer(cfg *config.Config, account *goSdk.Account, token config.Token
 			cfg.Amount*100000000)
 	} else {
 		params := []interface{}{"transfer", []interface{}{account.Address, toAddr, cfg.Amount}}
+		contractAddress, err := utils.AddressFromHexString(cfg.Contract)
+		if err != nil {
+			log.Errorf("parse contract addr failed, err: %s", err)
+			return
+		}
 		mutTx, err = genTxSdk.NeoVM.NewNeoVMInvokeTransaction(cfg.GasPrice, cfg.GasLimit, contractAddress, params)
 	}
 	if err != nil {
@@ -203,6 +203,7 @@ func balanceOf(cfg *config.Config, sdk *goSdk.DNASdk, address common.Address) {
 
 func signTx(sdk *goSdk.DNASdk, tx *types.MutableTransaction, nonce uint32, signer goSdk.Signer) error {
 	tx.Nonce = nonce
+	tx.Sigs = make([]types.Sig, 0)
 	err := sdk.SignToTransaction(tx, signer)
 	if err != nil {
 		return fmt.Errorf("sign tx failed, err: %s", err)

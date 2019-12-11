@@ -13,3 +13,8 @@
 
 .idea
 dna-bench
+wallet/*
+wallet*
+wallet.dat
+Log
+invoke*.txt
