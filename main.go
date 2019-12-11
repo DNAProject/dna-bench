@@ -103,29 +103,29 @@ func testTransfer(cfg *config.Config, account *goSdk.Account, token config.Token
 		return
 	}
 	genTxSdk := goSdk.NewDNASdk()
-	var mutTx *types.MutableTransaction
-	if token == config.GAS {
-		mutTx, err = genTxSdk.Native.Gas.NewTransferTransaction(cfg.GasPrice, cfg.GasLimit, account.Address, toAddr,
-			cfg.Amount*100000000)
-	} else {
-		params := []interface{}{"transfer", []interface{}{account.Address, toAddr, cfg.Amount}}
-		contractAddress, err := utils.AddressFromHexString(cfg.Contract)
-		if err != nil {
-			log.Errorf("parse contract addr failed, err: %s", err)
-			return
-		}
-		mutTx, err = genTxSdk.NeoVM.NewNeoVMInvokeTransaction(cfg.GasPrice, cfg.GasLimit, contractAddress, params)
-	}
-	if err != nil {
-		fmt.Println("construct tx err", err)
-		os.Exit(1)
-	}
 	exitChan := make(chan int)
 	txNumPerRoutine := txNum / cfg.RoutineNum
 	tpsPerRoutine := int64(cfg.TPS / cfg.RoutineNum)
 	startTestTime := time.Now().UnixNano() / 1e6
 	for i := uint(0); i < cfg.RoutineNum; i++ {
-		go func(nonce uint32, routineIndex uint) {
+		var mutTx *types.MutableTransaction
+		if token == config.GAS {
+			mutTx, err = genTxSdk.Native.Gas.NewTransferTransaction(cfg.GasPrice, cfg.GasLimit, account.Address, toAddr,
+				cfg.Amount*100000000)
+		} else {
+			params := []interface{}{"transfer", []interface{}{account.Address, toAddr, cfg.Amount}}
+			contractAddress, err := utils.AddressFromHexString(cfg.Contract)
+			if err != nil {
+				log.Errorf("parse contract addr failed, err: %s", err)
+				return
+			}
+			mutTx, err = genTxSdk.NeoVM.NewNeoVMInvokeTransaction(cfg.GasPrice, cfg.GasLimit, contractAddress, params)
+		}
+		if err != nil {
+			log.Errorf("construct tx failed, err: %s", err)
+			return
+		}
+		go func(nonce uint32, routineIndex uint, mutTx *types.MutableTransaction) {
 			sendTxSdk := goSdk.NewDNASdk()
 			rpcClient := client.NewRpcClient()
 			rpcClient.SetAddress(cfg.Rpc[int(routineIndex)%len(cfg.Rpc)])
@@ -173,7 +173,7 @@ func testTransfer(cfg *config.Config, account *goSdk.Account, token config.Token
 				}
 			}
 			exitChan <- 1
-		}(uint32(txNumPerRoutine*i)+cfg.StartNonce, i)
+		}(uint32(txNumPerRoutine*i)+cfg.StartNonce, i, mutTx)
 	}
 	for i := uint(0); i < cfg.RoutineNum; i++ {
 		<-exitChan
